@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>Popup Editor</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    html, body { height: 100%; margin: 0; font-family: system-ui, sans-serif; }
+    textarea { width: 100%; height: 100%; box-sizing: border-box; padding: 12px; border: none; resize: none; font-size: 16px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <textarea id="popupEditor" placeholder="Loading..."></textarea>
+
+  <script>
+    const ta = document.getElementById('popupEditor');
+
+    function sendRequestSync() {
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ type: 'request-sync' }, '*');
+        }
+      } catch (err) { /* ignore */ }
+    }
+
+    // 최초 로드 후 재연결 시도
+    window.addEventListener('DOMContentLoaded', () => setTimeout(sendRequestSync, 50));
+
+    // 포커스, visibility, 주기적 안전망
+    window.addEventListener('focus', sendRequestSync);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sendRequestSync(); });
+    const syncInterval = setInterval(sendRequestSync, 3000);
+
+    // 메인에서 동기화 메시지 수신
+    window.addEventListener('message', (e) => {
+      if (!e.data || !e.data.type) return;
+      if (e.data.type === 'sync' && typeof e.data.text === 'string') {
+        const cursor = ta.selectionStart;
+        ta.value = e.data.text;
+        // 가능하면 커서 보존(간단히)
+        try { ta.selectionStart = ta.selectionEnd = Math.min(cursor, ta.value.length); } catch(e){}
+      }
+    });
+
+    // 편집 시 메인에 업데이트 전송
+    ta.addEventListener('input', (e) => {
+      try { window.opener.postMessage({ type: 'update', text: e.target.value }, '*'); } catch (err) {}
+    });
+
+    // 정리
+    window.addEventListener('beforeunload', () => clearInterval(syncInterval));
+  </script>
+</body>
+</html>
