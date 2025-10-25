@@ -77,16 +77,34 @@ function renderMarkdown(){
 }
 renderMarkdown();
 
-window.onload = async function () {
-  const params = new URLSearchParams(location.search);
-  const filePath = params.get("file");
-  if (filePath) {
-    const response = await fetch(filePath);
+window.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const params = new URLSearchParams(location.search);
+    let filePath = params.get("file");
+    if (!filePath) return;
+
+    // URL에 따옴표가 포함돼 왔으면 제거
+    filePath = decodeURIComponent(filePath).replace(/^"+|"+$/g, '');
+
+    // 상대경로로 해석해 fetch 시도 (서버에서 제공되는 경우)
+    const url = new URL(filePath, location.href).href;
+
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+
     const text = await response.text();
-    document.getElementById("editor").value = text;
+
+    const textarea = document.getElementById('markdown');
+    if (!textarea) throw new Error('textarea#markdown not found in DOM');
+
+    textarea.value = text;
     renderMarkdown();
+  } catch (err) {
+    console.error('파일 로드 실패:', err);
+    // 사용자 안내 UI 업데이트
+    document.getElementById('fileStatus').textContent = '파일 로드 실패 — 콘솔 확인';
   }
-};
+});
 
 document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') editor.classList.add('collapsed'); });
 
@@ -285,4 +303,5 @@ function openMonacoPopup() {
 }
 </script>
 </body>
+
 </html>
