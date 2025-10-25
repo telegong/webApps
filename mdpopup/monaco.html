@@ -10,7 +10,7 @@
   <div id="container"></div>
   <script>
     let editor;
-
+    window.opener.postMessage({ type: 'request-sync' }, '*');
     function sendRequestSync() {
       try { if (window.opener && !window.opener.closed) window.opener.postMessage({ type: 'request-sync' }, '*'); } catch(e){}
     }
@@ -19,12 +19,19 @@
     window.addEventListener('DOMContentLoaded', () => setTimeout(sendRequestSync, 50));
     window.addEventListener('focus', sendRequestSync);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sendRequestSync(); });
-    const syncInterval = setInterval(sendRequestSync, 3000);
+    //const syncInterval = setInterval(sendRequestSync, 3000);
 
     window.addEventListener('message', (e) => {
       if (!e.data || !e.data.type) return;
       if (e.data.type === 'sync' && typeof e.data.text === 'string') {
-        if (editor) editor.setValue(e.data.text);
+        if (editor.getValue() !== e.data.text) { //editor.setValue(e.data.text);
+          const pos = editor.getPosition();
+          editor.executeEdits('sync', [{
+            range: editor.getModel().getFullModelRange(),
+            text: e.data.text,
+            forceMoveMarkers: true
+          }]);  
+        }
       }
     });
 
@@ -47,7 +54,7 @@
       sendRequestSync();
     });
 
-    window.addEventListener('beforeunload', () => clearInterval(syncInterval));
+    //window.addEventListener('beforeunload', () => clearInterval(syncInterval));
   </script>
 </body>
 </html>
