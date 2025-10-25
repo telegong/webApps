@@ -1,0 +1,3 @@
+이 파일을 
+https://telegong.github.io/webApps/mdpopup/?file=sample.txt
+로 브라우저에서 호출하면 보여야 한다
