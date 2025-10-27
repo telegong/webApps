@@ -256,7 +256,7 @@ function toggleTheme(){
   else link.href = "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css";
 }
 
-function updatePreviewPadding(){ if (editor.classList.contains('collapsed')) preview.style.paddingBottom = '0px'; else preview.style.paddingBottom = editor.offsetHeight + 'px'; }
+function updatePreviewPadding(){ if (editor.classList.contains('collapsed')) preview.style.paddingBottom = '0px'; else preview.style.paddingBottom = editor.offsetHeight + 200 + 'px'; }
 function toggleEditor(){ editor.classList.toggle('collapsed'); updatePreviewPadding(); }
 document.getElementById('closeEditor').addEventListener('click', () => { editor.classList.add('collapsed'); updatePreviewPadding(); });
 window.addEventListener('resize', updatePreviewPadding);
@@ -305,4 +305,5 @@ function openMonacoPopup() {
 </body>
 
 </html>
+
 
