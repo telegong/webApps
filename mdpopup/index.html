@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Markdown Read & PopUp Edit, OverWrite</title>
 
-  <link id="hljs-theme" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <!--link id="hljs-theme" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"-->
+  <link id="hljs-theme" rel="stylesheet" href="vscode-dark.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/lisp.min.js"></script>
 
@@ -50,6 +51,11 @@ function greet() {
   console.log("Hello, Markdown!");
 }
 ```
+
+https://telegong.github.io/webApps/mdpopup/?file=sample.md.txt
+
+https://telegong.github.io/webApps/mdpopup/?file=sample-mermaid-diagrams-for-data-generation-evolution.md.txt
+
     </textarea>
     <div class="editor-actions">
       <button id="closeEditor">접기</button>
@@ -57,8 +63,12 @@ function greet() {
   </section>
 
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
 
 <script>
+// Mermaid 초기화
+  mermaid.initialize({ startOnLoad: false });
+  
 // 전역 상태
 let popupWindows = [];
 let suppressCloseOnUnload = false;
@@ -69,10 +79,45 @@ const textarea = document.getElementById('markdown');
 const preview = document.getElementById('preview');
 let currentHandle = null;
 let originalText = '';
-let isModified = false;
+let isModified = false;  
 
-function renderMarkdown(){
-  preview.innerHTML = marked.parse(textarea.value);
+
+
+
+async function renderMarkdown(){
+  //preview.innerHTML = marked.parse(textarea.value);
+
+  let html = marked.parse(textarea.value);
+  // mermaid 코드블록 처리
+  html = html.replace(
+    /<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/g,
+    (match, code) => {
+      const decodedCode = new DOMParser().parseFromString(code, 'text/html').documentElement.textContent;
+      return `<div class="mermaid">\n${decodedCode}\n</div>\n`;
+    }
+  );
+  preview.innerHTML = html;
+  // mermaid 다이어그램 렌더링
+  // mermaid.init(undefined, preview.querySelectorAll('.mermaid'));
+  //requestAnimationFrame(() => {
+  //const mermaidElements = preview.querySelectorAll('.mermaid');
+  //if(mermaidElements.length > 0) {
+    try {
+      //mermaid.init(undefined, preview.querySelectorAll('.mermaid'));
+      //mermaid.init(undefined, mermaidElements);
+      await mermaid.run({querySelector:'#preview .mermaid'});
+   } catch (err) {
+      console.error("Mermaid 렌더링 실패:", err);
+   }
+  //});
+  //}
+
+  // Mermaid 블록은 highlight.js 대상에서 제거
+  //document.querySelectorAll('code.language-mermaid').forEach(el => {
+  //  el.classList.remove('hljs'); // highlight.js 스타일 제거
+  //});
+  
+  hljs.configure({ ignoreUnescapedHTML: true });
   hljs.highlightAll();
 }
 renderMarkdown();
@@ -256,7 +301,7 @@ function toggleTheme(){
   else link.href = "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css";
 }
 
-function updatePreviewPadding(){ if (editor.classList.contains('collapsed')) preview.style.paddingBottom = '0px'; else preview.style.paddingBottom = editor.offsetHeight + 200 + 'px'; }
+function updatePreviewPadding(){ if (editor.classList.contains('collapsed')) preview.style.paddingBottom = '100px'; else preview.style.paddingBottom = editor.offsetHeight+ 200 + 'px'; }
 function toggleEditor(){ editor.classList.toggle('collapsed'); updatePreviewPadding(); }
 document.getElementById('closeEditor').addEventListener('click', () => { editor.classList.add('collapsed'); updatePreviewPadding(); });
 window.addEventListener('resize', updatePreviewPadding);
@@ -305,5 +350,3 @@ function openMonacoPopup() {
 </body>
 
 </html>
-
-
