@@ -1,0 +1,84 @@
+/* VS Code Dark+ 스타일 기반 highlight.js 테마 */
+.hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 1em;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  border-radius: 6px;
+}
+
+/* 기본 토큰 */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-section,
+.hljs-link {
+  color: #c586c0;
+  font-weight: bold;
+}
+
+.hljs-function .hljs-title,
+.hljs-title.function_ {
+  color: #dcdcaa;
+}
+
+.hljs-string,
+.hljs-meta .hljs-string {
+  color: #ce9178;
+}
+
+.hljs-number,
+.hljs-attr,
+.hljs-variable.constant_ {
+  color: #b5cea8;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #6a9955;
+  font-style: italic;
+}
+
+.hljs-type,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-class .hljs-title {
+  color: #4ec9b0;
+}
+
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class {
+  color: #9cdcfe;
+}
+
+.hljs-attribute {
+  color: #d7ba7d;
+}
+
+.hljs-meta,
+.hljs-meta .hljs-keyword {
+  color: #569cd6;
+}
+
+.hljs-symbol,
+.hljs-bullet {
+  color: #d7ba7d;
+}
+
+.hljs-code,
+.hljs-formula {
+  color: #d4d4d4;
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: bold;
+}
