@@ -42,19 +42,33 @@
         language: 'markdown',
         theme: 'vs-dark',
         automaticLayout: true,
+        wordWrap: 'on',
         experimentalEditContextEnabled: false // IME 문제 완화 가능
       });
 
       editor.onDidChangeModelContent(() => {
         const text = editor.getValue();
-        try { window.opener.postMessage({ type: 'update', text }, '*'); } catch(e) {}
+        try { window.opener.postMessage({ type: 'update', text }, '*'); } catch(e) { }
       });
 
       // 로드 직후 메인에 싱크 요청
       sendRequestSync();
+
+      // Alt Z로 wordWrap 토글 (VS Code style)
+      editor.addAction({
+        id: 'toggle-word-wrap',
+        label: 'Toggle Word Wrap',
+        keybindings: [monaco.KeyMod.Alt | monaco.KeyCode.KeyZ],
+        run: function(ed) {
+          const currentWrap = ed.getOption(monaco.editor.EditorOption.wordWrap);  
+          ed.updateOptions({ wordWrap: currentWrap === 'on' ? 'off' : 'on' });
+        }
+      })          
     });
+    
 
     //window.addEventListener('beforeunload', () => clearInterval(syncInterval));
   </script>
 </body>
 </html>
+
