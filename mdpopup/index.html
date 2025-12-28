@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,19 +11,225 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/lisp.min.js"></script>
 
-<style>
-/* (생략: 기존 스타일 그대로) */
-html, body { height: 100%; margin: 0; display: flex; flex-direction: column; }
-button.active { filter: invert(100%); }
-.topbar { flex: 0 0 auto; display: flex; gap: 8px; padding: 8px 12px; }
-.preview { flex: 1 1 auto; overflow-y: auto; padding: 16px; background: var(--preview-bg, #fff); color: var(--preview-fg, #000); transition: padding-bottom 0.2s ease; font-weight: 550; line-height: 1.5; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-body.dark { background: #121212; color: #eee; }
-body.dark .preview { background: #1e1e1e; color: var(--preview-fg, #fff); border-color: #444; }
-.editor { position: fixed; left: 0; right: 0; bottom: 0; max-height: 60vh; background: var(--panel-bg, #111); border-top: 1px solid #333; box-shadow: 0 -8px 24px rgba(0,0,0,0.25); display: grid; grid-template-rows: 1fr auto; transition: transform 220ms ease, opacity 220ms ease; }
-.editor.collapsed { transform: translateY(100%); opacity: 0; pointer-events: none; }
-.editor textarea { width: 100%; height: 300px; resize: vertical; padding: 12px; padding-bottom: 200px; box-sizing: border-box; font-size: 16px; font-weight: 600; line-height: 1.5; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-@media print { html, body { height: auto !important; display: block !important; overflow: visible !important; } .topbar, .editor { display: none !important; } .preview { height: auto !important; overflow: visible !important; padding: 0 !important; } }
-</style>
+  <style>
+    /* 기본 레이아웃 */
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    button.active {
+      filter: invert(100%);
+    }
+
+    .topbar {
+      flex: 0 0 auto;
+      display: flex;
+      gap: 8px;
+      padding: 8px 12px;
+      flex-wrap: wrap;
+    }
+
+    /* 메인 컨테이너 (TOC + Preview) */
+    .main-container {
+      flex: 1 1 auto;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* TOC 사이드바 */
+    .toc-sidebar {
+      width: 220px;
+      min-width: 120px;
+      max-width: 400px;
+      background: var(--toc-bg, #f5f5f5);
+      border-right: 1px solid #ddd;
+      overflow-y: auto;
+      padding: 12px 8px;
+      font-size: 14px;
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    .toc-sidebar h3 {
+      margin: 0 0 12px 8px;
+      font-size: 14px;
+      color: #666;
+    }
+
+    .toc-sidebar ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .toc-sidebar li {
+      margin: 2px 0;
+    }
+
+    .toc-sidebar a {
+      display: block;
+      padding: 4px 8px;
+      color: #333;
+      text-decoration: none;
+      border-radius: 4px;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .toc-sidebar a:hover {
+      background: #e0e0e0;
+    }
+
+    .toc-sidebar a.active {
+      background: #0066cc;
+      color: #fff;
+    }
+
+    .toc-sidebar .toc-h2 {
+      padding-left: 16px;
+    }
+
+    .toc-sidebar .toc-h3 {
+      padding-left: 28px;
+      font-size: 13px;
+    }
+
+    .toc-sidebar .toc-h4 {
+      padding-left: 40px;
+      font-size: 12px;
+      color: #666;
+    }
+
+    /* 리사이즈 핸들 */
+    .toc-resizer {
+      width: 8px;
+      background: transparent;
+      cursor: col-resize;
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      transition: background 0.2s;
+      z-index: 10;
+    }
+
+    .toc-resizer:hover,
+    .toc-resizer.dragging {
+      background: #0066cc;
+    }
+
+    /* 미리보기 영역 */
+    .preview {
+      flex: 1 1 auto;
+      overflow-y: auto;
+      padding: 16px;
+      padding-bottom: 100vh;
+      /* 마지막 내용도 항상 상단까지 스크롤 가능 */
+      background: var(--preview-bg, #fff);
+      color: var(--preview-fg, #000);
+      font-weight: 550;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* 다크 테마 */
+    body.dark {
+      background: #121212;
+      color: #eee;
+    }
+
+    body.dark .toc-sidebar {
+      background: #1a1a1a;
+      border-color: #333;
+    }
+
+    body.dark .toc-sidebar h3 {
+      color: #888;
+    }
+
+    body.dark .toc-sidebar a {
+      color: #ccc;
+    }
+
+    body.dark .toc-sidebar a:hover {
+      background: #333;
+    }
+
+    body.dark .toc-sidebar a.active {
+      background: #0066cc;
+      color: #fff;
+    }
+
+    body.dark .preview {
+      background: #1e1e1e;
+      color: var(--preview-fg, #fff);
+      border-color: #444;
+    }
+
+    /* 에디터 패널 */
+    .editor {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      max-height: 60vh;
+      background: var(--panel-bg, #111);
+      border-top: 1px solid #333;
+      box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.25);
+      display: grid;
+      grid-template-rows: 1fr auto;
+      transition: transform 220ms ease, opacity 220ms ease;
+    }
+
+    .editor.collapsed {
+      transform: translateY(100%);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .editor textarea {
+      width: 100%;
+      height: 300px;
+      resize: vertical;
+      padding: 12px;
+      padding-bottom: 200px;
+      box-sizing: border-box;
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    @media print {
+
+      html,
+      body {
+        height: auto !important;
+        display: block !important;
+        overflow: visible !important;
+      }
+
+      .topbar,
+      .editor,
+      .toc-sidebar {
+        display: none !important;
+      }
+
+      .preview {
+        height: auto !important;
+        overflow: visible !important;
+        padding: 0 !important;
+      }
+    }
+  </style>
 </head>
 
 <body>
@@ -38,9 +245,18 @@ body.dark .preview { background: #1e1e1e; color: var(--preview-fg, #fff); border
   </header>
   <div id="fileStatus" style="padding: 4px 12px; font-size: 14px; color: #666;">📄 파일 없음</div>
 
-  <main id="preview" class="preview">
-    <p>여기에 미리보기가 표시됩니다</p>
-  </main>
+  <div class="main-container">
+    <aside id="tocSidebar" class="toc-sidebar">
+      <h3>📑 목차</h3>
+      <nav id="tocNav">
+        <ul></ul>
+      </nav>
+      <div class="toc-resizer" id="tocResizer"></div>
+    </aside>
+    <main id="preview" class="preview">
+      <p>여기에 미리보기가 표시됩니다</p>
+    </main>
+  </div>
 
   <section id="editorPanel" class="editor collapsed">
     <textarea id="markdown" placeholder="# 제목으로 시작해보세요">
@@ -62,291 +278,466 @@ https://telegong.github.io/webApps/mdpopup/?file=sample-mermaid-diagrams-for-dat
     </div>
   </section>
 
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
 
-<script>
-// Mermaid 초기화
-  mermaid.initialize({ startOnLoad: false });
-  
-// 전역 상태
-let popupWindows = [];
-let suppressCloseOnUnload = false;
-const editorState = { text: '', currentHandle: null };
+  <script>
+    // Mermaid 초기화
+    mermaid.initialize({ startOnLoad: false });
 
-const editor = document.getElementById('editorPanel');
-const textarea = document.getElementById('markdown');
-const preview = document.getElementById('preview');
-let currentHandle = null;
-let originalText = '';
-let isModified = false;  
+    // 전역 상태
+    let popupWindows = [];
+    let suppressCloseOnUnload = false;
+    const editorState = { text: '', currentHandle: null };
 
-
-
-
-async function renderMarkdown(){
-  //preview.innerHTML = marked.parse(textarea.value);
-
-  let html = marked.parse(textarea.value);
-  // mermaid 코드블록 처리
-  html = html.replace(
-    /<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/g,
-    (match, code) => {
-      const decodedCode = new DOMParser().parseFromString(code, 'text/html').documentElement.textContent;
-      return `<div class="mermaid">\n${decodedCode}\n</div>\n`;
-    }
-  );
-  preview.innerHTML = html;
-  // mermaid 다이어그램 렌더링
-  // mermaid.init(undefined, preview.querySelectorAll('.mermaid'));
-  //requestAnimationFrame(() => {
-  //const mermaidElements = preview.querySelectorAll('.mermaid');
-  //if(mermaidElements.length > 0) {
-    try {
-      //mermaid.init(undefined, preview.querySelectorAll('.mermaid'));
-      //mermaid.init(undefined, mermaidElements);
-      await mermaid.run({querySelector:'#preview .mermaid'});
-   } catch (err) {
-      console.error("Mermaid 렌더링 실패:", err);
-   }
-  //});
-  //}
-
-  // Mermaid 블록은 highlight.js 대상에서 제거
-  //document.querySelectorAll('code.language-mermaid').forEach(el => {
-  //  el.classList.remove('hljs'); // highlight.js 스타일 제거
-  //});
-  
-  hljs.configure({ ignoreUnescapedHTML: true });
-  hljs.highlightAll();
-}
-renderMarkdown();
-
-window.addEventListener('DOMContentLoaded', async () => {
-  try {
-    const params = new URLSearchParams(location.search);
-    let filePath = params.get("file");
-    if (!filePath) return;
-
-    // URL에 따옴표가 포함돼 왔으면 제거
-    filePath = decodeURIComponent(filePath).replace(/^"+|"+$/g, '');
-
-    // 상대경로로 해석해 fetch 시도 (서버에서 제공되는 경우)
-    const url = new URL(filePath, location.href).href;
-
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
-
-    const text = await response.text();
-
+    const editor = document.getElementById('editorPanel');
     const textarea = document.getElementById('markdown');
-    if (!textarea) throw new Error('textarea#markdown not found in DOM');
+    const preview = document.getElementById('preview');
+    let currentHandle = null;
+    let originalText = '';
+    let isModified = false;
 
-    textarea.value = text;
-    renderMarkdown();
-  } catch (err) {
-    console.error('파일 로드 실패:', err);
-    // 사용자 안내 UI 업데이트
-    document.getElementById('fileStatus').textContent = '파일 로드 실패 — 콘솔 확인';
-  }
-});
 
-document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') editor.classList.add('collapsed'); });
 
-function syncScroll(source, target){
-  const ratio = source.scrollTop / (source.scrollHeight - source.clientHeight || 1);
-  target.scrollTop = ratio * (target.scrollHeight - target.clientHeight || 0);
-}
-textarea.addEventListener('scroll', ()=> syncScroll(textarea, preview));
 
-// textarea input -> broadcast to all popups
-textarea.addEventListener('input', () => {
-  editorState.text = textarea.value;
-  isModified = textarea.value !== originalText;
-  renderMarkdown();
-  updateFileStatus();
+    async function renderMarkdown() {
+      //preview.innerHTML = marked.parse(textarea.value);
 
-  popupWindows = popupWindows.filter(p => p && !p.closed);
-  popupWindows.forEach(p => {
-    try { p.postMessage({ type: 'sync', text: textarea.value }, '*'); } catch (err) {}
-  });
-});
+      let html = marked.parse(textarea.value);
+      // mermaid 코드블록 처리
+      html = html.replace(
+        /<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/g,
+        (match, code) => {
+          const decodedCode = new DOMParser().parseFromString(code, 'text/html').documentElement.textContent;
+          return `<div class="mermaid">\n${decodedCode}\n</div>\n`;
+        }
+      );
+      preview.innerHTML = html;
+      // mermaid 다이어그램 렌더링
 
-// 정리 타이머(안전망)
-setInterval(() => { popupWindows = popupWindows.filter(p => p && !p.closed); }, 2000);
+      try {
 
-// 버튼 helper
-function activateButton(btn, action){
-  btn.classList.add('active');
-  setTimeout(()=>{ action(); btn.classList.remove('active'); }, 100);
-}
-async function activateButtonAsync(btn, asyncAction){
-  btn.classList.add('active');
-  try { await asyncAction(); } finally { btn.classList.remove('active'); }
-}
+        await mermaid.run({ querySelector: '#preview .mermaid' });
+      } catch (err) {
+        console.error("Mermaid 렌더링 실패:", err);
+      }
 
-// 파일 선택
-async function pickFile(){
-  suppressCloseOnUnload = true;
-  try {
-    const [handle] = await window.showOpenFilePicker({
-      types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md', '.md.txt'], 'text/plain': ['.txt'] } }]
-    });
-    await openFile(handle);
-  } finally {
-    setTimeout(()=> suppressCloseOnUnload = false, 150);
-  }
-}
 
-// 드래그 앤 드롭
-preview.addEventListener('dragover', (e) => e.preventDefault());
-preview.addEventListener('drop', async (e) => {
-  e.preventDefault();
-  suppressCloseOnUnload = true;
-  try {
-    const item = e.dataTransfer.items[0];
-    if (item && item.kind === 'file') {
-      const handle = await item.getAsFileSystemHandle();
-      if (handle && handle.kind === 'file') await openFile(handle);
+      hljs.configure({ ignoreUnescapedHTML: true });
+      hljs.highlightAll();
+
+      // TOC 업데이트
+      updateTOC();
     }
-  } finally {
-    setTimeout(()=> suppressCloseOnUnload = false, 150);
-  }
-});
+    renderMarkdown();
 
-// 팝업 닫기 함수
-function closeAllPopups() {
-  popupWindows.forEach(p => { try { if (p && !p.closed) p.close(); } catch(e){} });
-  popupWindows = [];
-}
+    window.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const params = new URLSearchParams(location.search);
+        let filePath = params.get("file");
+        if (!filePath) return;
 
-// beforeunload: 기본적으로 새로고침/탭닫기 때 팝업 닫음
-window.addEventListener('beforeunload', (e) => {
-  if (!suppressCloseOnUnload) closeAllPopups();
-  // 저장 확인을 네이티브로 띄우려면 아래처럼 메시지 세팅 가능(브라우저 지원 제한)
-  if (isModified) {
-    const msg = "저장하지 않은 변경사항이 있습니다. 계속하면 변경사항이 손실됩니다.";
-    e.returnValue = msg;
-    return msg;
-  }
-});
+        // URL에 따옴표가 포함돼 왔으면 제거
+        filePath = decodeURIComponent(filePath).replace(/^"+|"+$/g, '');
 
-// openFile (파일 열기)
-async function openFile(handle){
-  // 새 파일 열 때 기존 팝업 닫기(선택적)
-  //closeAllPopups();
-  /* const shouldClose = confirm("파일을 열면 현재 열린 팝업들을 닫습니다. [취소]팝업유지");
-  if (shouldClose) closeAllPopups();
-  */
+        // 상대경로로 해석해 fetch 시도 (서버에서 제공되는 경우)
+        const url = new URL(filePath, location.href).href;
 
-  const file = await handle.getFile();
-  const text = await file.text();
-  editorState.text = text;
-  editorState.currentHandle = handle;
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
 
-  textarea.value = text;
-  originalText = text;
-  isModified = false;
-  currentHandle = handle;
-  renderMarkdown();
-  updateFileStatus();
+        const text = await response.text();
 
-  // 필요시 팝업들이 있다면 동기화 (여기선 이미 closeAllPopups 호출했으므로 배열 비어있음)
-  popupWindows = popupWindows.filter(p => p && !p.closed);
-  popupWindows.forEach(p => {
-    try { p.postMessage({ type: 'sync', text }, '*'); } catch (err) {}
-  });
-}
+        const textarea = document.getElementById('markdown');
+        if (!textarea) throw new Error('textarea#markdown not found in DOM');
 
-// 저장, 다른 이름으로 저장 (기존 코드 유지)
-async function saveText(){
-  const text = textarea.value;
-  if (!currentHandle) {
-    const options = { types: [{ description: 'Markdown Files', accept: { 'text/markdown': ['.md'], 'text/plain': ['.txt'] } }]};
-    try { currentHandle = await window.showSaveFilePicker(options); } catch(e){ console.warn("저장 취소", e); return; }
-  }
-  try {
-    const writable = await currentHandle.createWritable();
-    await writable.write(text);
-    await writable.close();
-    originalText = text; isModified = false; updateFileStatus();
-    alert("저장 완료!");
-  } catch (err) { console.error("저장 실패", err); alert("저장 중 오류"); }
-}
-async function saveAs(){
-  const text = textarea.value;
-  const options = { suggestedName: 'document.md', types:[{ description:'Markdown Files', accept:{ 'text/markdown':['.md'], 'text/plain':['.txt'] } }]};
-  try {
-    const handle = await window.showSaveFilePicker(options);
-    const writable = await handle.createWritable();
-    await writable.write(text);
-    await writable.close();
-    currentHandle = handle; originalText = text; isModified = false; updateFileStatus();
-    alert("다른 이름으로 저장 완료!");
-  } catch (err) { if (err.name !== 'AbortError') { console.error("다른 이름 저장 실패", err); alert("저장 중 오류"); } }
-}
+        textarea.value = text;
+        renderMarkdown();
+      } catch (err) {
+        console.error('파일 로드 실패:', err);
+        // 사용자 안내 UI 업데이트
+        document.getElementById('fileStatus').textContent = '파일 로드 실패 — 콘솔 확인';
+      }
+    });
 
-async function updateFileStatus(){
-  let name = '파일 없음';
-  if (currentHandle && currentHandle.name) name = currentHandle.name;
-  else if (currentHandle) { const file = await currentHandle.getFile(); name = file.name; }
-  const status = isModified ? '🟡 수정됨' : '🟢 저장됨';
-  document.getElementById('fileStatus').textContent = `📄 ${name} — ${status}`;
-}
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') editor.classList.add('collapsed'); });
 
-function toggleTheme(){
-  document.body.classList.toggle('dark');
-  const link = document.querySelector('#hljs-theme');
-  if (document.body.classList.contains('dark')) link.href = "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css";
-  else link.href = "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css";
-}
+    function syncScroll(source, target) {
+      const ratio = source.scrollTop / (source.scrollHeight - source.clientHeight || 1);
+      target.scrollTop = ratio * (target.scrollHeight - target.clientHeight || 0);
+    }
+    textarea.addEventListener('scroll', () => syncScroll(textarea, preview));
 
-function updatePreviewPadding(){ if (editor.classList.contains('collapsed')) preview.style.paddingBottom = '100px'; else preview.style.paddingBottom = editor.offsetHeight+ 200 + 'px'; }
-function toggleEditor(){ editor.classList.toggle('collapsed'); updatePreviewPadding(); }
-document.getElementById('closeEditor').addEventListener('click', () => { editor.classList.add('collapsed'); updatePreviewPadding(); });
-window.addEventListener('resize', updatePreviewPadding);
-const ro = new ResizeObserver(() => updatePreviewPadding()); ro.observe(editor);
-
-// 팝업 열기 (별도 파일 popup.html 사용)
-function openEditorPopup() {
-  // open with unique name if you want multiple instances, or fixed name to reuse window
-  const popup = window.open('popup.html', `editorPopup-${Date.now()}`, 'width=640,height=480,resizable=yes');
-  popupWindows.push(popup);
-}
-
-// 메인: 메시지 수신 (팝업의 request-sync 재등록, 팝업 업데이트 브로드캐스트)
-window.addEventListener('message', (e) => {
-  if (!e.data || !e.data.type) return;
-
-  if (e.data.type === 'request-sync') {
-    try {
-      const src = e.source;
-      if (src && !popupWindows.includes(src)) popupWindows.push(src);
-      src.postMessage({ type: 'sync', text: textarea.value }, '*');
-    } catch (err) { console.warn('request-sync 처리 중 에러', err); }
-    return;
-  }
-
-  if (e.data.type === 'update') {
-    if (typeof e.data.text === 'string') {
-      textarea.value = e.data.text;
-      editorState.text = e.data.text;
+    // textarea input -> broadcast to all popups
+    textarea.addEventListener('input', () => {
+      editorState.text = textarea.value;
+      isModified = textarea.value !== originalText;
       renderMarkdown();
       updateFileStatus();
-    }
-    popupWindows = popupWindows.filter(p => p && !p.closed);
-    popupWindows.forEach(p => {
-      try { if (p !== e.source && !p.closed) p.postMessage({ type: 'sync', text: e.data.text }, '*'); } catch (err) {}
-    });
-  }
-});
 
-// 모나코 팝업 열기 (별도 파일 monaco.html)
-function openMonacoPopup() {
-  const popup = window.open('monaco.html', `monacoEditor-${Date.now()}`, 'width=800,height=600,resizable=yes');
-  popupWindows.push(popup);
-}
-</script>
+      popupWindows = popupWindows.filter(p => p && !p.closed);
+      popupWindows.forEach(p => {
+        try { p.postMessage({ type: 'sync', text: textarea.value }, '*'); } catch (err) { }
+      });
+    });
+
+    // 정리 타이머(안전망)
+    setInterval(() => { popupWindows = popupWindows.filter(p => p && !p.closed); }, 2000);
+
+    // 버튼 helper
+    function activateButton(btn, action) {
+      btn.classList.add('active');
+      setTimeout(() => { action(); btn.classList.remove('active'); }, 100);
+    }
+    async function activateButtonAsync(btn, asyncAction) {
+      btn.classList.add('active');
+      try { await asyncAction(); } finally { btn.classList.remove('active'); }
+    }
+
+    // 마크다운 확장자 판별
+    function isMarkdownFile(filename) {
+      const lower = filename.toLowerCase();
+      return lower.endsWith('.md') || lower.endsWith('.md.txt');
+    }
+
+    // 소스 파일을 Monaco에서 열기
+    async function openSourceInMonaco(handle) {
+      const file = await handle.getFile();
+      const text = await file.text();
+
+      // Monaco 팝업 열기 (독립 모드)
+      const popup = window.open('monaco.html?mode=standalone', `monacoSource-${Date.now()}`, 'width=900,height=700,resizable=yes');
+
+      // 파일 정보 전달 (팝업이 로드된 후)
+      const sendFile = () => {
+        if (popup && !popup.closed) {
+          popup.postMessage({
+            type: 'open-file',
+            filename: file.name,
+            text: text
+          }, '*');
+        }
+      };
+
+      // 약간의 지연 후 전송 (팝업 로드 대기)
+      setTimeout(sendFile, 300);
+      setTimeout(sendFile, 600); // 재시도
+    }
+
+    // 파일 선택
+    async function pickFile() {
+      suppressCloseOnUnload = true;
+      try {
+        const [handle] = await window.showOpenFilePicker({
+          types: [
+            {
+              description: 'All Supported Files', accept: {
+                'text/markdown': ['.md', '.md.txt'],
+                'text/plain': ['.txt', '.js', '.ts', '.py', '.css', '.html', '.json', '.xml', '.yaml', '.yml']
+              }
+            }
+          ]
+        });
+
+        const file = await handle.getFile();
+
+        if (isMarkdownFile(file.name)) {
+          // 마크다운은 현재 창에서 열기
+          await openFile(handle);
+        } else {
+          // 소스 파일은 Monaco에서 열기
+          await openSourceInMonaco(handle);
+        }
+      } finally {
+        setTimeout(() => suppressCloseOnUnload = false, 150);
+      }
+    }
+
+    // 드래그 앤 드롭
+    preview.addEventListener('dragover', (e) => e.preventDefault());
+    preview.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      suppressCloseOnUnload = true;
+      try {
+        const item = e.dataTransfer.items[0];
+        if (item && item.kind === 'file') {
+          const handle = await item.getAsFileSystemHandle();
+          if (handle && handle.kind === 'file') await openFile(handle);
+        }
+      } finally {
+        setTimeout(() => suppressCloseOnUnload = false, 150);
+      }
+    });
+
+    // 팝업 닫기 함수
+    function closeAllPopups() {
+      popupWindows.forEach(p => { try { if (p && !p.closed) p.close(); } catch (e) { } });
+      popupWindows = [];
+    }
+
+    // beforeunload: 기본적으로 새로고침/탭닫기 때 팝업 닫음
+    window.addEventListener('beforeunload', (e) => {
+      if (!suppressCloseOnUnload) closeAllPopups();
+      // 저장 확인을 네이티브로 띄우려면 아래처럼 메시지 세팅 가능(브라우저 지원 제한)
+      if (isModified) {
+        const msg = "저장하지 않은 변경사항이 있습니다. 계속하면 변경사항이 손실됩니다.";
+        e.returnValue = msg;
+        return msg;
+      }
+    });
+
+    // openFile (파일 열기)
+    async function openFile(handle) {
+      // 새 파일 열 때 기존 팝업 닫기(선택적)
+      //closeAllPopups();
+      /* const shouldClose = confirm("파일을 열면 현재 열린 팝업들을 닫습니다. [취소]팝업유지");
+      if (shouldClose) closeAllPopups();
+      */
+
+      const file = await handle.getFile();
+      const text = await file.text();
+      editorState.text = text;
+      editorState.currentHandle = handle;
+
+      textarea.value = text;
+      originalText = text;
+      isModified = false;
+      currentHandle = handle;
+      renderMarkdown();
+      updateFileStatus();
+
+      // 필요시 팝업들이 있다면 동기화 (여기선 이미 closeAllPopups 호출했으므로 배열 비어있음)
+      popupWindows = popupWindows.filter(p => p && !p.closed);
+      popupWindows.forEach(p => {
+        try { p.postMessage({ type: 'sync', text }, '*'); } catch (err) { }
+      });
+    }
+
+    // 저장, 다른 이름으로 저장 (기존 코드 유지)
+    async function saveText() {
+      const text = textarea.value;
+      if (!currentHandle) {
+        const options = { types: [{ description: 'Markdown Files', accept: { 'text/markdown': ['.md'], 'text/plain': ['.txt'] } }] };
+        try { currentHandle = await window.showSaveFilePicker(options); } catch (e) { console.warn("저장 취소", e); return; }
+      }
+      try {
+        const writable = await currentHandle.createWritable();
+        await writable.write(text);
+        await writable.close();
+        originalText = text; isModified = false; updateFileStatus();
+        alert("저장 완료!");
+      } catch (err) { console.error("저장 실패", err); alert("저장 중 오류"); }
+    }
+    async function saveAs() {
+      const text = textarea.value;
+      const options = { suggestedName: 'document.md', types: [{ description: 'Markdown Files', accept: { 'text/markdown': ['.md'], 'text/plain': ['.txt'] } }] };
+      try {
+        const handle = await window.showSaveFilePicker(options);
+        const writable = await handle.createWritable();
+        await writable.write(text);
+        await writable.close();
+        currentHandle = handle; originalText = text; isModified = false; updateFileStatus();
+        alert("다른 이름으로 저장 완료!");
+      } catch (err) { if (err.name !== 'AbortError') { console.error("다른 이름 저장 실패", err); alert("저장 중 오류"); } }
+    }
+
+    async function updateFileStatus() {
+      let name = '파일 없음';
+      if (currentHandle && currentHandle.name) name = currentHandle.name;
+      else if (currentHandle) { const file = await currentHandle.getFile(); name = file.name; }
+      const status = isModified ? '🟡 수정됨' : '🟢 저장됨';
+      document.getElementById('fileStatus').textContent = `📄 ${name} — ${status}`;
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle('dark');
+      const link = document.querySelector('#hljs-theme');
+      if (document.body.classList.contains('dark')) link.href = "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css";
+      else link.href = "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css";
+    }
+
+    function updatePreviewPadding() {
+      if (editor.classList.contains('collapsed')) {
+        preview.style.paddingBottom = 'calc(100vh)';
+      } else {
+        // 에디터가 열려있을 때: 100vh와 에디터 높이+200px 중 큰 값 사용
+        preview.style.paddingBottom = `max(100vh, ${editor.offsetHeight + 200}px)`;
+      }
+    }
+    function toggleEditor() { editor.classList.toggle('collapsed'); updatePreviewPadding(); }
+    document.getElementById('closeEditor').addEventListener('click', () => { editor.classList.add('collapsed'); updatePreviewPadding(); });
+    window.addEventListener('resize', updatePreviewPadding);
+    const ro = new ResizeObserver(() => updatePreviewPadding()); ro.observe(editor);
+
+    // ========== TOC 기능 ==========
+    const tocSidebar = document.getElementById('tocSidebar');
+    const tocNav = document.getElementById('tocNav');
+    const tocResizer = document.getElementById('tocResizer');
+
+    // 스크롤 중 하이라이트 업데이트 잠금
+    let isScrollLocked = false;
+
+    // TOC 생성
+    function updateTOC() {
+      const headings = preview.querySelectorAll('h1, h2, h3, h4');
+      const ul = document.createElement('ul');
+
+      headings.forEach((heading, index) => {
+        // ID 부여 (없으면 생성)
+        if (!heading.id) {
+          heading.id = 'heading-' + index;
+        }
+
+        const li = document.createElement('li');
+        const a = document.createElement('a');
+        a.href = '#' + heading.id;
+        a.textContent = heading.textContent;
+        a.className = 'toc-' + heading.tagName.toLowerCase();
+        a.dataset.target = heading.id;
+
+        a.addEventListener('click', (e) => {
+          e.preventDefault();
+
+          // 클릭 시 즉시 하이라이트
+          tocNav.querySelectorAll('a').forEach(link => link.classList.remove('active'));
+          a.classList.add('active');
+
+          // 스크롤 중 하이라이트 업데이트 잠금
+          isScrollLocked = true;
+
+          heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+          // 스크롤 애니메이션 완료 후 잠금 해제 (약 500ms)
+          setTimeout(() => {
+            isScrollLocked = false;
+          }, 500);
+        });
+
+        li.appendChild(a);
+        ul.appendChild(li);
+      });
+
+      tocNav.innerHTML = '';
+      tocNav.appendChild(ul);
+
+      // 현재 위치 하이라이트 초기화
+      highlightCurrentSection();
+    }
+
+    // 현재 섹션 하이라이트
+    function highlightCurrentSection() {
+      // 스크롤 잠금 중이면 업데이트 스킵
+      if (isScrollLocked) return;
+
+      const headings = preview.querySelectorAll('h1, h2, h3, h4');
+      const tocLinks = tocNav.querySelectorAll('a');
+
+      if (headings.length === 0) return;
+
+      const previewRect = preview.getBoundingClientRect();
+      const offset = 100; // 상단 여유
+
+      let currentId = null;
+
+      headings.forEach((heading) => {
+        const rect = heading.getBoundingClientRect();
+        const relativeTop = rect.top - previewRect.top;
+
+        if (relativeTop <= offset) {
+          currentId = heading.id;
+        }
+      });
+
+      // 첫 번째로 fallback
+      if (!currentId && headings.length > 0) {
+        currentId = headings[0].id;
+      }
+
+      tocLinks.forEach((link) => {
+        if (link.dataset.target === currentId) {
+          link.classList.add('active');
+          // TOC 내에서 스크롤하여 현재 항목이 보이도록
+          link.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+          link.classList.remove('active');
+        }
+      });
+    }
+
+    // 미리보기 스크롤 시 하이라이트 업데이트
+    preview.addEventListener('scroll', () => {
+      requestAnimationFrame(highlightCurrentSection);
+    });
+
+    // TOC 사이드바 리사이즈
+    let isResizing = false;
+
+    tocResizer.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      isResizing = true;
+      tocResizer.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isResizing) return;
+      const newWidth = e.clientX - tocSidebar.getBoundingClientRect().left;
+      if (newWidth >= 120 && newWidth <= 400) {
+        tocSidebar.style.width = newWidth + 'px';
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isResizing) {
+        isResizing = false;
+        tocResizer.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    });
+
+    // 팝업 열기 (별도 파일 popup.html 사용)
+    function openEditorPopup() {
+      // open with unique name if you want multiple instances, or fixed name to reuse window
+      const popup = window.open('popup.html', `editorPopup-${Date.now()}`, 'width=640,height=480,resizable=yes');
+      popupWindows.push(popup);
+    }
+
+    // 메인: 메시지 수신 (팝업의 request-sync 재등록, 팝업 업데이트 브로드캐스트)
+    window.addEventListener('message', (e) => {
+      if (!e.data || !e.data.type) return;
+
+      if (e.data.type === 'request-sync') {
+        try {
+          const src = e.source;
+          if (src && !popupWindows.includes(src)) popupWindows.push(src);
+          src.postMessage({ type: 'sync', text: textarea.value }, '*');
+        } catch (err) { console.warn('request-sync 처리 중 에러', err); }
+        return;
+      }
+
+      if (e.data.type === 'update') {
+        if (typeof e.data.text === 'string') {
+          textarea.value = e.data.text;
+          editorState.text = e.data.text;
+          renderMarkdown();
+          updateFileStatus();
+        }
+        popupWindows = popupWindows.filter(p => p && !p.closed);
+        popupWindows.forEach(p => {
+          try { if (p !== e.source && !p.closed) p.postMessage({ type: 'sync', text: e.data.text }, '*'); } catch (err) { }
+        });
+      }
+    });
+
+    // 모나코 팝업 열기 (별도 파일 monaco.html)
+    function openMonacoPopup() {
+      const popup = window.open('monaco.html', `monacoEditor-${Date.now()}`, 'width=800,height=600,resizable=yes');
+      popupWindows.push(popup);
+    }
+  </script>
 </body>
 
 </html>

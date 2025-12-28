@@ -1,74 +1,400 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
   <meta charset="UTF-8">
   <title>Monaco Editor</title>
-  <style> html, body { margin: 0; height: 100%; } #container { width: 100%; height: 100%; } </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
-</head>
-<body>
-  <div id="container"></div>
-  <script>
-    let editor;
-    window.opener.postMessage({ type: 'request-sync' }, '*');
-    function sendRequestSync() {
-      try { if (window.opener && !window.opener.closed) window.opener.postMessage({ type: 'request-sync' }, '*'); } catch(e){}
+  <style>
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: #1e1e1e;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
 
-    // 재등록 트리거
-    window.addEventListener('DOMContentLoaded', () => setTimeout(sendRequestSync, 50));
-    window.addEventListener('focus', sendRequestSync);
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sendRequestSync(); });
-    //const syncInterval = setInterval(sendRequestSync, 3000);
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      padding: 8px 12px;
+      background: #252526;
+      border-bottom: 1px solid #3c3c3c;
+      align-items: center;
+      flex-shrink: 0;
+    }
 
+    .toolbar button {
+      padding: 6px 12px;
+      background: #0e639c;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .toolbar button:hover {
+      background: #1177bb;
+    }
+
+    .file-info {
+      margin-left: auto;
+      font-size: 13px;
+      color: #888;
+    }
+
+    .file-info .filename {
+      color: #ccc;
+      margin-right: 8px;
+    }
+
+    .file-info .status {
+      color: #4ec9b0;
+    }
+
+    .file-info .status.modified {
+      color: #dcdcaa;
+    }
+
+    #container {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .mode-indicator {
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 3px;
+      background: #3c3c3c;
+      color: #9cdcfe;
+    }
+
+    .mode-indicator.sync {
+      background: #264f78;
+      color: #4fc1ff;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+</head>
+
+<body>
+  <div class="toolbar">
+    <button id="btnOpen">📁 열기</button>
+    <button id="btnSave">💾 저장</button>
+    <button id="btnSaveAs">📄 다른 이름으로 저장</button>
+    <span class="mode-indicator" id="modeIndicator">Standalone</span>
+    <div class="file-info">
+      <span class="filename" id="fileName">새 파일</span>
+      <span class="status" id="fileStatus">저장됨</span>
+    </div>
+  </div>
+  <div id="container"></div>
+
+  <script>
+    let editor;
+    let currentHandle = null;
+    let originalText = '';
+    let isModified = false;
+    let isSyncMode = false;
+
+    // URL 파라미터 확인
+    const params = new URLSearchParams(location.search);
+    const mode = params.get('mode');
+
+    // 확장자 → 언어 매핑
+    const langMap = {
+      'js': 'javascript',
+      'mjs': 'javascript',
+      'jsx': 'javascript',
+      'ts': 'typescript',
+      'tsx': 'typescript',
+      'py': 'python',
+      'css': 'css',
+      'scss': 'scss',
+      'less': 'less',
+      'html': 'html',
+      'htm': 'html',
+      'xml': 'xml',
+      'json': 'json',
+      'md': 'markdown',
+      'txt': 'plaintext',
+      'yaml': 'yaml',
+      'yml': 'yaml',
+      'sh': 'shell',
+      'bash': 'shell',
+      'ps1': 'powershell',
+      'sql': 'sql',
+      'java': 'java',
+      'c': 'c',
+      'cpp': 'cpp',
+      'h': 'c',
+      'hpp': 'cpp',
+      'cs': 'csharp',
+      'go': 'go',
+      'rs': 'rust',
+      'rb': 'ruby',
+      'php': 'php',
+      'swift': 'swift',
+      'kt': 'kotlin',
+      'r': 'r',
+      'lua': 'lua'
+    };
+
+    function getLanguageFromFilename(filename) {
+      const ext = filename.split('.').pop().toLowerCase();
+      return langMap[ext] || 'plaintext';
+    }
+
+    function updateFileStatus() {
+      const statusEl = document.getElementById('fileStatus');
+      const nameEl = document.getElementById('fileName');
+
+      nameEl.textContent = currentHandle ? currentHandle.name : '새 파일';
+
+      if (isModified) {
+        statusEl.textContent = '수정됨';
+        statusEl.classList.add('modified');
+      } else {
+        statusEl.textContent = '저장됨';
+        statusEl.classList.remove('modified');
+      }
+    }
+
+    function updateModeIndicator() {
+      const indicator = document.getElementById('modeIndicator');
+      if (isSyncMode) {
+        indicator.textContent = '🔗 Sync';
+        indicator.classList.add('sync');
+      } else {
+        indicator.textContent = 'Standalone';
+        indicator.classList.remove('sync');
+      }
+    }
+
+    // Sync 모드 함수들 (기존 기능)
+    function sendRequestSync() {
+      if (!isSyncMode) return;
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ type: 'request-sync' }, '*');
+        }
+      } catch (e) { }
+    }
+
+    // 파일 열기
+    async function openFile() {
+      try {
+        const [handle] = await window.showOpenFilePicker({
+          types: [{
+            description: 'All Files',
+            accept: {
+              'text/*': ['.txt', '.md', '.js', '.ts', '.py', '.css', '.html', '.json', '.xml', '.yaml', '.yml']
+            }
+          }]
+        });
+
+        const file = await handle.getFile();
+        const text = await file.text();
+
+        currentHandle = handle;
+        originalText = text;
+        isModified = false;
+
+        // 에디터에 텍스트 설정
+        editor.setValue(text);
+
+        // 언어 설정
+        const lang = getLanguageFromFilename(file.name);
+        monaco.editor.setModelLanguage(editor.getModel(), lang);
+
+        // Sync 모드 해제 (독립 파일 열면)
+        isSyncMode = false;
+        updateModeIndicator();
+        updateFileStatus();
+
+        // 창 제목 업데이트
+        document.title = `Monaco - ${file.name}`;
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('파일 열기 실패:', err);
+        }
+      }
+    }
+
+    // 파일 저장
+    async function saveFile() {
+      if (!currentHandle) {
+        return saveFileAs();
+      }
+
+      try {
+        const writable = await currentHandle.createWritable();
+        await writable.write(editor.getValue());
+        await writable.close();
+
+        originalText = editor.getValue();
+        isModified = false;
+        updateFileStatus();
+      } catch (err) {
+        console.error('저장 실패:', err);
+        alert('저장 중 오류가 발생했습니다.');
+      }
+    }
+
+    // 다른 이름으로 저장
+    async function saveFileAs() {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: currentHandle ? currentHandle.name : 'untitled.txt',
+          types: [{
+            description: 'Text Files',
+            accept: { 'text/plain': ['.txt', '.md', '.js', '.py', '.css', '.html'] }
+          }]
+        });
+
+        const writable = await handle.createWritable();
+        await writable.write(editor.getValue());
+        await writable.close();
+
+        currentHandle = handle;
+        originalText = editor.getValue();
+        isModified = false;
+
+        // 언어 업데이트
+        const lang = getLanguageFromFilename(handle.name);
+        monaco.editor.setModelLanguage(editor.getModel(), lang);
+
+        updateFileStatus();
+        document.title = `Monaco - ${handle.name}`;
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('저장 실패:', err);
+          alert('저장 중 오류가 발생했습니다.');
+        }
+      }
+    }
+
+    // 메시지 수신
     window.addEventListener('message', (e) => {
       if (!e.data || !e.data.type) return;
+
+      // index.html에서 소스 파일 열기 요청
+      if (e.data.type === 'open-file') {
+        const { filename, text } = e.data;
+
+        editor.setValue(text);
+        originalText = text;
+        isModified = false;
+
+        // 언어 설정
+        const lang = getLanguageFromFilename(filename);
+        monaco.editor.setModelLanguage(editor.getModel(), lang);
+
+        document.getElementById('fileName').textContent = filename;
+        document.title = `Monaco - ${filename}`;
+        updateFileStatus();
+        return;
+      }
+
+      // Sync 모드 (마크다운 동기화)
       if (e.data.type === 'sync' && typeof e.data.text === 'string') {
-        if (editor.getValue() !== e.data.text) { //editor.setValue(e.data.text);
+        isSyncMode = true;
+        updateModeIndicator();
+
+        if (editor.getValue() !== e.data.text) {
           const pos = editor.getPosition();
           editor.executeEdits('sync', [{
             range: editor.getModel().getFullModelRange(),
             text: e.data.text,
             forceMoveMarkers: true
-          }]);  
+          }]);
         }
       }
     });
 
+    // Monaco 에디터 초기화
     require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } });
     require(['vs/editor/editor.main'], function () {
       editor = monaco.editor.create(document.getElementById('container'), {
         value: '',
-        language: 'markdown',
+        language: 'plaintext',
         theme: 'vs-dark',
         automaticLayout: true,
         wordWrap: 'on',
-        experimentalEditContextEnabled: false // IME 문제 완화 가능
+        minimap: { enabled: true },
+        fontSize: 14,
+        experimentalEditContextEnabled: false
       });
 
+      // 내용 변경 감지
       editor.onDidChangeModelContent(() => {
         const text = editor.getValue();
-        try { window.opener.postMessage({ type: 'update', text }, '*'); } catch(e) { }
+        isModified = text !== originalText;
+        updateFileStatus();
+
+        // Sync 모드일 때 메인 창에 전송
+        if (isSyncMode) {
+          try {
+            window.opener.postMessage({ type: 'update', text }, '*');
+          } catch (e) { }
+        }
       });
 
-      // 로드 직후 메인에 싱크 요청
-      sendRequestSync();
-
-      // Alt Z로 wordWrap 토글 (VS Code style)
+      // Alt+Z로 wordWrap 토글
       editor.addAction({
         id: 'toggle-word-wrap',
         label: 'Toggle Word Wrap',
         keybindings: [monaco.KeyMod.Alt | monaco.KeyCode.KeyZ],
-        run: function(ed) {
-          const currentWrap = ed.getOption(monaco.editor.EditorOption.wordWrap);  
+        run: function (ed) {
+          const currentWrap = ed.getOption(monaco.editor.EditorOption.wordWrap);
           ed.updateOptions({ wordWrap: currentWrap === 'on' ? 'off' : 'on' });
         }
-      })          
-    });
-    
+      });
 
-    //window.addEventListener('beforeunload', () => clearInterval(syncInterval));
+      // Ctrl+S로 저장
+      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+        if (isSyncMode) {
+          // Sync 모드에서는 메인 창의 저장 기능 사용
+          alert('Sync 모드에서는 메인 창에서 저장하세요.');
+        } else {
+          saveFile();
+        }
+      });
+
+      // opener가 있으면 Sync 모드로 시작
+      if (window.opener && !window.opener.closed && mode !== 'standalone') {
+        isSyncMode = true;
+        updateModeIndicator();
+        sendRequestSync();
+      }
+
+      updateFileStatus();
+    });
+
+    // 버튼 이벤트
+    document.getElementById('btnOpen').addEventListener('click', openFile);
+    document.getElementById('btnSave').addEventListener('click', saveFile);
+    document.getElementById('btnSaveAs').addEventListener('click', saveFileAs);
+
+    // Sync 모드 재등록
+    window.addEventListener('DOMContentLoaded', () => setTimeout(sendRequestSync, 50));
+    window.addEventListener('focus', sendRequestSync);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') sendRequestSync();
+    });
+
+    // 창 닫기 전 확인
+    window.addEventListener('beforeunload', (e) => {
+      if (isModified && !isSyncMode) {
+        const msg = '저장하지 않은 변경사항이 있습니다.';
+        e.returnValue = msg;
+        return msg;
+      }
+    });
   </script>
 </body>
-</html>
 
+</html>
