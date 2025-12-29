@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <title>IDE - Project Explorer</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background: #1e1e1e;
+            color: #cccccc;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 13px;
+        }
+
+        /* 툴바 */
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            padding: 8px 12px;
+            background: #252526;
+            border-bottom: 1px solid #3c3c3c;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .toolbar button {
+            padding: 6px 12px;
+            background: #0e639c;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .toolbar button:hover {
+            background: #1177bb;
+        }
+
+        .toolbar button:disabled {
+            background: #3c3c3c;
+            color: #666;
+            cursor: not-allowed;
+        }
+
+        .file-info {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .file-info .filename {
+            color: #ccc;
+        }
+
+        .file-info .status {
+            color: #4ec9b0;
+        }
+
+        .file-info .status.modified {
+            color: #dcdcaa;
+        }
+
+        /* 메인 컨테이너 */
+        .main-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* 익스플로러 사이드바 */
+        .explorer {
+            width: 250px;
+            min-width: 150px;
+            max-width: 500px;
+            background: #252526;
+            border-right: 1px solid #3c3c3c;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .explorer-header {
+            padding: 10px 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #888;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #3c3c3c;
+        }
+
+        .explorer-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 4px 0;
+        }
+
+        .no-folder {
+            padding: 20px;
+            text-align: center;
+            color: #666;
+        }
+
+        /* 파일 트리 */
+        .tree-item {
+            display: flex;
+            align-items: center;
+            padding: 4px 8px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .tree-item:hover {
+            background: #2a2d2e;
+        }
+
+        .tree-item.selected {
+            background: #094771;
+        }
+
+        .tree-item .icon {
+            width: 16px;
+            height: 16px;
+            margin-right: 6px;
+            flex-shrink: 0;
+        }
+
+        .tree-item .name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .tree-item .arrow {
+            width: 16px;
+            height: 16px;
+            margin-right: 2px;
+            flex-shrink: 0;
+            transition: transform 0.1s;
+        }
+
+        .tree-item .arrow.expanded {
+            transform: rotate(90deg);
+        }
+
+        .tree-item .arrow.hidden {
+            visibility: hidden;
+        }
+
+        .tree-children {
+            padding-left: 16px;
+        }
+
+        .tree-children.collapsed {
+            display: none;
+        }
+
+        /* 리사이저 */
+        .resizer {
+            width: 4px;
+            background: transparent;
+            cursor: col-resize;
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            z-index: 10;
+        }
+
+        .resizer:hover,
+        .resizer.dragging {
+            background: #007acc;
+        }
+
+        /* 에디터 영역 */
+        .editor-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .editor-placeholder {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 14px;
+        }
+
+        #monacoContainer {
+            flex: 1;
+            display: none;
+        }
+
+        #monacoContainer.visible {
+            display: block;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+</head>
+
+<body>
+    <div class="toolbar">
+        <button id="btnOpenFolder">📁 폴더 열기</button>
+        <button id="btnSave" disabled>💾 저장</button>
+        <button id="btnRefresh" disabled>🔄 새로고침</button>
+        <div class="file-info">
+            <span class="filename" id="fileName"></span>
+            <span class="status" id="fileStatus"></span>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <aside class="explorer">
+            <div class="explorer-header">탐색기</div>
+            <div class="explorer-content" id="explorerContent">
+                <div class="no-folder">📁 폴더를 열어주세요</div>
+            </div>
+            <div class="resizer" id="resizer"></div>
+        </aside>
+
+        <main class="editor-container">
+            <div class="editor-placeholder" id="editorPlaceholder">
+                파일을 선택하면 여기에 표시됩니다
+            </div>
+            <div id="monacoContainer"></div>
+        </main>
+    </div>
+
+    <script>
+        let editor;
+        let rootDirHandle = null;
+        let currentFileHandle = null;
+        let originalText = '';
+        let isModified = false;
+        let fileHandleMap = new Map(); // path -> handle
+
+        // 확장자 → 언어 매핑
+        const langMap = {
+            'js': 'javascript', 'mjs': 'javascript', 'jsx': 'javascript',
+            'ts': 'typescript', 'tsx': 'typescript',
+            'py': 'python', 'css': 'css', 'scss': 'scss', 'less': 'less',
+            'html': 'html', 'htm': 'html', 'xml': 'xml',
+            'json': 'json', 'md': 'markdown', 'txt': 'plaintext',
+            'yaml': 'yaml', 'yml': 'yaml', 'sh': 'shell', 'bash': 'shell',
+            'ps1': 'powershell', 'sql': 'sql', 'java': 'java',
+            'c': 'c', 'cpp': 'cpp', 'h': 'c', 'hpp': 'cpp',
+            'cs': 'csharp', 'go': 'go', 'rs': 'rust', 'rb': 'ruby',
+            'php': 'php', 'swift': 'swift', 'kt': 'kotlin', 'r': 'r', 'lua': 'lua'
+        };
+
+        function getLanguage(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            return langMap[ext] || 'plaintext';
+        }
+
+        function getFileIcon(name, isDir) {
+            if (isDir) return '📁';
+            const ext = name.split('.').pop().toLowerCase();
+            const icons = {
+                'js': '📜', 'ts': '📘', 'py': '🐍', 'html': '🌐', 'css': '🎨',
+                'json': '📋', 'md': '📝', 'txt': '📄', 'svg': '🖼️', 'png': '🖼️',
+                'jpg': '🖼️', 'gif': '🖼️'
+            };
+            return icons[ext] || '📄';
+        }
+
+        // 상태 업데이트
+        function updateStatus() {
+            const nameEl = document.getElementById('fileName');
+            const statusEl = document.getElementById('fileStatus');
+            const btnSave = document.getElementById('btnSave');
+
+            if (currentFileHandle) {
+                nameEl.textContent = currentFileHandle.name;
+                btnSave.disabled = false;
+            } else {
+                nameEl.textContent = '';
+                btnSave.disabled = true;
+            }
+
+            if (isModified) {
+                statusEl.textContent = '● 수정됨';
+                statusEl.classList.add('modified');
+            } else {
+                statusEl.textContent = currentFileHandle ? '저장됨' : '';
+                statusEl.classList.remove('modified');
+            }
+        }
+
+        // 폴더 열기
+        async function openFolder() {
+            try {
+                rootDirHandle = await window.showDirectoryPicker();
+                document.getElementById('btnRefresh').disabled = false;
+                await refreshTree();
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.error('폴더 열기 실패:', err);
+                }
+            }
+        }
+
+        // 트리 새로고침
+        async function refreshTree() {
+            if (!rootDirHandle) return;
+
+            const content = document.getElementById('explorerContent');
+            content.innerHTML = '';
+            fileHandleMap.clear();
+
+            const tree = await buildTree(rootDirHandle, '');
+            content.appendChild(tree);
+        }
+
+        // 트리 구조 생성
+        async function buildTree(dirHandle, path) {
+            const container = document.createElement('div');
+            container.className = 'tree-children';
+
+            const entries = [];
+            for await (const entry of dirHandle.values()) {
+                entries.push(entry);
+            }
+
+            // 정렬: 폴더 먼저, 그 다음 파일, 알파벳순
+            entries.sort((a, b) => {
+                if (a.kind !== b.kind) return a.kind === 'directory' ? -1 : 1;
+                return a.name.localeCompare(b.name);
+            });
+
+            for (const entry of entries) {
+                const fullPath = path ? `${path}/${entry.name}` : entry.name;
+
+                // 숨김 파일/폴더 스킵
+                if (entry.name.startsWith('.')) continue;
+                // node_modules 스킵
+                if (entry.name === 'node_modules') continue;
+
+                const item = document.createElement('div');
+                item.className = 'tree-item';
+                item.dataset.path = fullPath;
+
+                if (entry.kind === 'directory') {
+                    item.innerHTML = `
+            <span class="arrow">▶</span>
+            <span class="icon">${getFileIcon(entry.name, true)}</span>
+            <span class="name">${entry.name}</span>
+          `;
+
+                    const children = document.createElement('div');
+                    children.className = 'tree-children collapsed';
+
+                    let loaded = false;
+
+                    item.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        const arrow = item.querySelector('.arrow');
+                        const isExpanded = arrow.classList.contains('expanded');
+
+                        if (!loaded && !isExpanded) {
+                            // 처음 열 때 하위 항목 로드
+                            const subTree = await buildTree(entry, fullPath);
+                            children.innerHTML = subTree.innerHTML;
+                            loaded = true;
+                        }
+
+                        arrow.classList.toggle('expanded');
+                        children.classList.toggle('collapsed');
+                    });
+
+                    container.appendChild(item);
+                    container.appendChild(children);
+                } else {
+                    // 파일
+                    fileHandleMap.set(fullPath, entry);
+
+                    item.innerHTML = `
+            <span class="arrow hidden">▶</span>
+            <span class="icon">${getFileIcon(entry.name, false)}</span>
+            <span class="name">${entry.name}</span>
+          `;
+
+                    item.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+
+                        // 선택 표시
+                        document.querySelectorAll('.tree-item.selected').forEach(el => el.classList.remove('selected'));
+                        item.classList.add('selected');
+
+                        await openFile(entry, fullPath);
+                    });
+
+                    container.appendChild(item);
+                }
+            }
+
+            return container;
+        }
+
+        // 파일 열기
+        async function openFile(handle, path) {
+            try {
+                const file = await handle.getFile();
+                const text = await file.text();
+
+                currentFileHandle = handle;
+                originalText = text;
+                isModified = false;
+
+                // Monaco 표시
+                document.getElementById('editorPlaceholder').style.display = 'none';
+                document.getElementById('monacoContainer').classList.add('visible');
+
+                editor.setValue(text);
+                monaco.editor.setModelLanguage(editor.getModel(), getLanguage(handle.name));
+
+                document.title = `IDE - ${handle.name}`;
+                updateStatus();
+            } catch (err) {
+                console.error('파일 열기 실패:', err);
+            }
+        }
+
+        // 저장
+        async function saveFile() {
+            if (!currentFileHandle) return;
+
+            try {
+                const writable = await currentFileHandle.createWritable();
+                await writable.write(editor.getValue());
+                await writable.close();
+
+                originalText = editor.getValue();
+                isModified = false;
+                updateStatus();
+            } catch (err) {
+                console.error('저장 실패:', err);
+                alert('저장 중 오류가 발생했습니다.');
+            }
+        }
+
+        // Monaco 초기화
+        require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } });
+        require(['vs/editor/editor.main'], function () {
+            editor = monaco.editor.create(document.getElementById('monacoContainer'), {
+                value: '',
+                language: 'plaintext',
+                theme: 'vs-dark',
+                automaticLayout: true,
+                wordWrap: 'on',
+                minimap: { enabled: true },
+                fontSize: 14
+            });
+
+            editor.onDidChangeModelContent(() => {
+                isModified = editor.getValue() !== originalText;
+                updateStatus();
+            });
+
+            // Ctrl+S 저장
+            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, saveFile);
+
+            // Alt+Z 줄바꿈 토글
+            editor.addAction({
+                id: 'toggle-word-wrap',
+                label: 'Toggle Word Wrap',
+                keybindings: [monaco.KeyMod.Alt | monaco.KeyCode.KeyZ],
+                run: (ed) => {
+                    const current = ed.getOption(monaco.editor.EditorOption.wordWrap);
+                    ed.updateOptions({ wordWrap: current === 'on' ? 'off' : 'on' });
+                }
+            });
+        });
+
+        // 리사이저
+        const explorer = document.querySelector('.explorer');
+        const resizer = document.getElementById('resizer');
+        let isResizing = false;
+
+        resizer.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            isResizing = true;
+            resizer.classList.add('dragging');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            const newWidth = e.clientX;
+            if (newWidth >= 150 && newWidth <= 500) {
+                explorer.style.width = newWidth + 'px';
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                resizer.classList.remove('dragging');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            }
+        });
+
+        // 버튼 이벤트
+        document.getElementById('btnOpenFolder').addEventListener('click', openFolder);
+        document.getElementById('btnSave').addEventListener('click', saveFile);
+        document.getElementById('btnRefresh').addEventListener('click', refreshTree);
+
+        // 창 닫기 전 확인
+        window.addEventListener('beforeunload', (e) => {
+            if (isModified) {
+                const msg = '저장하지 않은 변경사항이 있습니다.';
+                e.returnValue = msg;
+                return msg;
+            }
+        });
+    </script>
+</body>
+
+</html>
