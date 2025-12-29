@@ -375,7 +375,8 @@
                         if (!loaded && !isExpanded) {
                             // 처음 열 때 하위 항목 로드
                             const subTree = await buildTree(entry, fullPath);
-                            children.innerHTML = subTree.innerHTML;
+                            //children.innerHTML = subTree.innerHTML;
+                            children.replaceChildren(...subTree.childNodes)
                             loaded = true;
                         }
 
@@ -532,5 +533,6 @@
         });
     </script>
 </body>
+
 
 </html>
