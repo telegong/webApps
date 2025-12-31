@@ -7,4 +7,4 @@ https://telegong.github.io/webApps/mdpopup/ide.html
 - render & edit markdown ('.md', '.md.txt')
 - edit source files ('.txt', '.js', '.ts', '.py', '.css', '.html', '.json', '.xml', '.yaml', '.yml')
 
-**Alt. vscode.dev[https://vscode.dev]**
+**Alt. [vscode.dev](https://vscode.dev)**
