@@ -278,6 +278,26 @@ https://telegong.github.io/webApps/mdpopup/?file=sample-mermaid-diagrams-for-dat
     </div>
   </section>
 
+
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        processEscapes: true,
+        // 마크다운 엔진이 \를 가로채지 않도록 보호
+        processEnvironments: true
+      },
+      options: {
+        // preview 영역 내부만 감시하도록 설정 가능
+        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      },
+      startup: {
+        typeset: false // 페이지 로드 시 자동 실행 방지 (수동으로 제어)
+      }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
 
@@ -298,12 +318,19 @@ https://telegong.github.io/webApps/mdpopup/?file=sample-mermaid-diagrams-for-dat
     let isModified = false;
 
 
-
-
     async function renderMarkdown() {
-      //preview.innerHTML = marked.parse(textarea.value);
 
-      let html = marked.parse(textarea.value);
+      //MathJax 용 백슬래시 보강
+      let rawText = textarea.value;
+      let processedText = rawText
+        .replace(/\\\[/g, '\\\\[')
+        .replace(/\\\]/g, '\\\\]')
+        .replace(/\\\(/g, '\\\\(')
+        .replace(/\\\)/g, '\\\\)');        
+      
+      //preview.innerHTML = marked.parse(textarea.value);
+      let html = marked.parse(processedText);
+
       // mermaid 코드블록 처리
       html = html.replace(
         /<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/g,
@@ -322,6 +349,10 @@ https://telegong.github.io/webApps/mdpopup/?file=sample-mermaid-diagrams-for-dat
         console.error("Mermaid 렌더링 실패:", err);
       }
 
+      // --- 추가: MathJax 수식 렌더링 실행 ---
+      if (window.MathJax && window.MathJax.typesetPromise) {
+        window.MathJax.typesetPromise([preview]).catch((err) => console.error("MathJax 실패:", err));
+      }
 
       hljs.configure({ ignoreUnescapedHTML: true });
       hljs.highlightAll();
