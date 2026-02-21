@@ -208,97 +208,45 @@
       -moz-osx-font-smoothing: grayscale;
     }
 
+/* ============================================================
+       인쇄(PDF) 최적화 스타일 통합
+       ============================================================ */
     @media print {
-      .mermaid svg {
-        max-width: 100% !important;
-        height: auto !important;
-      }
-      /* 1. 인쇄 시 불필요한 레이아웃 초기화 */
-      html, body {
-        height: auto !important;
-        overflow: visible !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        width: 100% !important;
-      }
-    
-      /* 2. 상단바, 에디터, 사이드바 완전 제거 */
-      .topbar, .editor, .toc-sidebar, .toc-resizer, #fileStatus {
-        display: none !important;
-      }
-    
-      /* 3. 메인 컨테이너 구조 해제 */
-      .main-container {
-        display: block !important;
-        overflow: visible !important;
-      }
-    
-      /* 4. 미리보기 영역 최적화 (가장 중요) */
-      .preview {
-        width: 100% !important;
-        margin: 0 !important;
-        padding: 0 !important; /* 내부 여백 제거 */
-        overflow: visible !important;
-        height: auto !important;
-        position: static !important;
-        
-        /* 텍스트 잘림 방지 */
-        word-wrap: break-word;
-      }
-    
-      /* 5. 코드 블록이나 이미지가 종이 너비를 넘지 않도록 설정 */
-      pre, code, img, table, .mermaid {
-        max-width: 100% !important;
-        white-space: pre-wrap !important; /* 코드 줄바꿈 허용 */
-        word-break: break-all;
-      }
-    
-      /* 6. PDF 출력 시 배경색 및 색상 유지 (선택 사항) */
-      body {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-    
-      /* 7. 페이지 여백 설정 (A4 기준) */
-      @page {
-        size: A4;
-        margin: 15mm; /* 브라우저 기본 여백 대신 직접 제어 */
-      }
-      /* 1. 표(Table) 제어: 페이지가 넘어가도 제목줄 반복 */
-      table {
-        width: 100% !important;
-        border-collapse: collapse;
-        break-inside: auto !important; /* 표는 페이지 분할 허용 */
-      }
-      
-      thead {
-        display: table-header-group; /* 다음 페이지에서도 표 헤더 자동 생성 */
-      }
-    
-      tr {
-        break-inside: avoid; /* 행(Row) 중간이 잘리는 것 방지 */
-        break-after: auto;
-      }
-    
-      /* 2. 코드 블록 제어: 내용이 많으면 분할 허용하되 가독성 유지 */
-      pre {
+      /* 1. 기본 레이아웃 초기화 */
+      html, body { height: auto !important; overflow: visible !important; width: 100% !important; margin: 0 !important; padding: 0 !important; background: white !important; color: black !important; }
+      .topbar, .editor, .toc-sidebar, .toc-resizer, #fileStatus, .editor-actions { display: none !important; }
+      .main-container { display: block !important; overflow: visible !important; width: 100% !important; }
+
+      /* 2. 미리보기 영역 확장 및 잘림 방지 */
+      .preview { display: block !important; width: 100% !important; padding: 0 !important; margin: 0 !important; overflow: visible !important; height: auto !important; border: none !important; font-size: 11pt; }
+
+      /* 3. 자동/수동 페이지 관리 */
+      h1 { break-before: page; margin-top: 0 !important; } /* 모든 # 제목은 새 페이지에서 시작 */
+      h1:first-of-type { break-before: auto; } /* 첫 제목 제외 */
+      h1, h2, h3 { break-after: avoid; } /* 제목 바로 뒤 끊김 방지 */
+      .page-break { display: block; height: 0; break-before: page; } /* ---page--- 처리용 */
+
+      /* 4. 표(Table) 최적화: 페이지 넘어가도 헤더 반복 */
+      table { width: 100% !important; border-collapse: collapse; break-inside: auto !important; }
+      thead { display: table-header-group !important; } /* 다음 페이지 상단에 헤더 고정 */
+      tr { break-inside: avoid; }
+      td, th { border: 1px solid #ddd; padding: 8px; }
+
+      /* 5. 코드 블록 및 이미지 잘림 방지 */
+      pre { 
         break-inside: auto !important; 
-        white-space: pre-wrap !important; /* 우측 잘림 방지 */
-        word-break: break-all;
-        padding: 10px;
-        border: 1px solid #ddd;
+        white-space: pre-wrap !important; 
+        word-break: break-all !important; 
+        border: 1px solid #eee !important;
+        background: #f9f9f9 !important;
+        color: #333 !important;
       }
-    
-      /* 3. 용지 크기 선택 (A4 기본, 필요 시 A3로 변경 가능) */
+      img, .mermaid { max-width: 100% !important; height: auto !important; break-inside: avoid; }
+
+      /* 6. 용지 설정: 기본 A4, A3 선택 가능 */
       @page {
-        /* size: A3 landscape; // A3 가로 모드가 필요하다면 이렇게 수정 */
-        size: A4; 
+        size: A4; /* A3로 뽑고 싶다면 인쇄 창 설정에서 A3 선택 시 자동 대응됨 */
         margin: 15mm;
-      }
-    
-      /* 만약 특정 문서만 A3로 출력하고 싶다면 클래스 활용 */
-      body.a3-mode @page {
-        size: A3;
       }
     }
   </style>
@@ -344,6 +292,14 @@ https://telegong.github.io/webApps/mdpopup/?file=sample.md.txt
 
 https://telegong.github.io/webApps/mdpopup/?file=sample-mermaid-diagrams-for-data-generation-evolution.md.txt
 
+# 1페이지 제목
+내용...
+
+---page---
+
+# 2페이지 제목 (자동 분할됨)
+내용...
+      
     </textarea>
     <div class="editor-actions">
       <button id="closeEditor">접기</button>
@@ -846,4 +802,5 @@ https://telegong.github.io/webApps/mdpopup/?file=sample-mermaid-diagrams-for-dat
 
 
 </html>
+
 
