@@ -264,6 +264,42 @@
         size: A4;
         margin: 15mm; /* 브라우저 기본 여백 대신 직접 제어 */
       }
+      /* 1. 표(Table) 제어: 페이지가 넘어가도 제목줄 반복 */
+      table {
+        width: 100% !important;
+        border-collapse: collapse;
+        break-inside: auto !important; /* 표는 페이지 분할 허용 */
+      }
+      
+      thead {
+        display: table-header-group; /* 다음 페이지에서도 표 헤더 자동 생성 */
+      }
+    
+      tr {
+        break-inside: avoid; /* 행(Row) 중간이 잘리는 것 방지 */
+        break-after: auto;
+      }
+    
+      /* 2. 코드 블록 제어: 내용이 많으면 분할 허용하되 가독성 유지 */
+      pre {
+        break-inside: auto !important; 
+        white-space: pre-wrap !important; /* 우측 잘림 방지 */
+        word-break: break-all;
+        padding: 10px;
+        border: 1px solid #ddd;
+      }
+    
+      /* 3. 용지 크기 선택 (A4 기본, 필요 시 A3로 변경 가능) */
+      @page {
+        /* size: A3 landscape; // A3 가로 모드가 필요하다면 이렇게 수정 */
+        size: A4; 
+        margin: 15mm;
+      }
+    
+      /* 만약 특정 문서만 A3로 출력하고 싶다면 클래스 활용 */
+      body.a3-mode @page {
+        size: A3;
+      }
     }
   </style>
 </head>
@@ -362,7 +398,8 @@ https://telegong.github.io/webApps/mdpopup/?file=sample-mermaid-diagrams-for-dat
         .replace(/\\\[/g, '\\\\[')
         .replace(/\\\]/g, '\\\\]')
         .replace(/\\\(/g, '\\\\(')
-        .replace(/\\\)/g, '\\\\)');        
+        .replace(/\\\)/g, '\\\\)')
+        .replace(/^---page---$/gm, '<div class="page-break"></div>');
       
       //preview.innerHTML = marked.parse(textarea.value);
       let html = marked.parse(processedText);
@@ -809,3 +846,4 @@ https://telegong.github.io/webApps/mdpopup/?file=sample-mermaid-diagrams-for-dat
 
 
 </html>
+
